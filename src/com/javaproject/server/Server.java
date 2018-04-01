@@ -1,5 +1,9 @@
 package com.javaproject.server;
 
+import com.javaproject.server.controller.ClientController;
+import com.javaproject.server.model.clients.ClientContainer;
+import com.javaproject.server.model.network.SocketManager;
+
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -8,7 +12,6 @@ import java.net.Socket;
  * Created by (TheOne) on 26-Mar-18.
  */
 public class Server {
-    private int i = 0;
     public void start(int port) {
         startSocket(port);
     }
@@ -27,49 +30,24 @@ public class Server {
     }
 
     private void createThreadForClient(Socket client) {
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                     while (!Thread.interrupted()) {
-                         gettingClientMessages(client);
+        SocketManager socketManager = new SocketManager(client);
+        ClientContainer container = new ClientContainer();
+        ClientController clientController = new ClientController(container, socketManager);
+
+        new Thread(() -> {
+            try {
+                 while (!Thread.interrupted()) {
+                     String clientEvent = socketManager.readSocket();
+                     if(clientEvent != null && !clientEvent.isEmpty()) {
+                         clientController.handleEvent(clientEvent);
+                     } else {
+                         Thread.sleep(500);
                      }
-                } catch (IOException | ClassNotFoundException | InterruptedException e) {
-                    Thread.yield();
-                    e.printStackTrace();
-                }
+                 }
+            } catch (IOException | ClassNotFoundException | InterruptedException e) {
+                Thread.yield();
+                e.printStackTrace();
             }
         }).start();
-    }
-
-    private void pingClient(Socket client) throws IOException, InterruptedException {
-        BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(client.getOutputStream()));
-        writer.write("Server echo: pint " + i++ + "\n");
-        writer.flush();
-        Thread.sleep(500);
-    }
-
-    private void gettingClientMessages(Socket client) throws IOException, ClassNotFoundException, InterruptedException {
-        BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(client.getInputStream()));
-        getStringFromSocket(bufferedReader, client);
-        Thread.sleep(500L);
-
-    }
-
-    private void getStringFromSocket(BufferedReader bufferedReader, Socket client) throws IOException {
-        String line;
-        while (bufferedReader.ready()) {
-            line = bufferedReader.readLine();
-            handleRequest(line, client);
-        }
-    }
-
-    private void handleRequest(String line, Socket client) throws IOException {
-        System.out.println("Getting from client: " + line);
-
-        BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(client.getOutputStream()));
-        writer.write("Server echo: " + line + "\n");
-        writer.flush();
-        System.out.println("written: " + line);
     }
 }
